@@ -39,7 +39,8 @@ function buildInitialState(inject) {
       total: null
     },
     headerMappings: {},
-    validationResult: new ValidationResult()
+    validationResult: new ValidationResult(),
+    withAutoMapping: false
   }
 }
 
@@ -117,6 +118,33 @@ const reducer = (state, action) => {
         formattedData: newFormattedData
       }
     }
+    case 'HEADER_MAPPINGS_AUTO_CONFIRMED': {
+      Object.values(action.payload.headerMappings).forEach((element) => {
+        element.confirmed = true
+      })
+
+      const newFormattedData = formatData(
+        action.payload.headerMappings,
+        state.parsed.data
+      )
+
+      const transformedFormattedData = applyTransformations(
+        newFormattedData,
+        state.fields
+      )
+
+      return {
+        ...state,
+        ...computeMetadata(
+          newFormattedData,
+          state.fields,
+          action.payload.headerMappings
+        ),
+        headerMappings: action.payload.headerMappings,
+        formattedData: transformedFormattedData,
+        currentStep: 2
+      }
+    }
     case 'CELL_CHANGED': {
       const copy = [...state.formattedData]
       copy[action.payload.index] = action.payload.row
@@ -138,8 +166,8 @@ const reducer = (state, action) => {
       return state
   }
 }
-
-const Importer = ({ theme, onComplete, fields, isPasteEnabled }) => {
+// TODO: add more callbacks
+const Importer = ({ theme, onComplete, fields, withAutoMapping, isPasteEnabled }) => {
   const [
     {
       currentStep,
@@ -153,7 +181,7 @@ const Importer = ({ theme, onComplete, fields, isPasteEnabled }) => {
       failed
     },
     dispatch
-  ] = useReducer(reducer, buildInitialState({ fields }))
+  ] = useReducer(reducer, buildInitialState({ fields, withAutoMapping }))
 
   const restart = () => {
     dispatch({ type: 'RESTART' })
@@ -164,6 +192,9 @@ const Importer = ({ theme, onComplete, fields, isPasteEnabled }) => {
       skipEmptyLines: true,
       complete: (newParsed) => {
         dispatch({ type: 'CSV_PARSED', payload: { parsed: newParsed } })
+        if(withAutoMapping) {
+          dispatch({ type: 'HEADER_MAPPINGS_AUTO_CONFIRMED', payload: { parsed: newParsed } })
+        }
       }
     })
   }
@@ -258,7 +289,7 @@ const Importer = ({ theme, onComplete, fields, isPasteEnabled }) => {
                 setString={setString}
                 statistics={statistics}
                 formattedData={
-                  formattedData.length > 0 ? formattedData : rowData
+                  formattedData.length > 0 ? formattedData.concat(rowData) : rowData // TODO: add single empty row each time
                 }
                 fields={fields}
                 headerMappings={headerMappings}
