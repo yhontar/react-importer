@@ -5,6 +5,7 @@ import FileUploader from './components/FileUploader'
 import HeaderMapper from './components/HeaderMapper'
 import DataEditor from './components/DataEditor'
 import Completed from './components/Completed'
+import PasteInput from './components/PasteInput'
 import {
   fieldIsRequired,
   formatData,
@@ -78,7 +79,7 @@ const reducer = (state, action) => {
         currentStep
       }
     }
-    case 'FILE_PARSED': {
+    case 'CSV_PARSED': {
       const automaticHeaderMappings = buildSuggestedHeaderMappings(
         state.fields,
         action.payload.parsed.data[0]
@@ -138,7 +139,7 @@ const reducer = (state, action) => {
   }
 }
 
-const Importer = ({ theme, onComplete, fields }) => {
+const Importer = ({ theme, onComplete, fields, isPasteEnabled }) => {
   const [
     {
       currentStep,
@@ -158,13 +159,21 @@ const Importer = ({ theme, onComplete, fields }) => {
     dispatch({ type: 'RESTART' })
   }
 
-  const setFile = (file) => {
-    Papa.parse(file, {
+  const parseCSV = (input) => {
+    Papa.parse(input, {
       skipEmptyLines: true,
       complete: (newParsed) => {
-        dispatch({ type: 'FILE_PARSED', payload: { parsed: newParsed } })
+        dispatch({ type: 'CSV_PARSED', payload: { parsed: newParsed } })
       }
     })
+  }
+
+  const setFile = (file) => {
+    parseCSV(file)
+  }
+
+  const setString = (csv) => {
+    parseCSV(csv)
   }
 
   const rowData = []
@@ -220,7 +229,7 @@ const Importer = ({ theme, onComplete, fields }) => {
   }
 
   const finalTheme = mergeDeep({}, THEME_DEFAULT, theme)
-  console.log(theme?.colors?.primary, finalTheme.colors.primary)
+
   return (
     <ThemeProvider theme={finalTheme}>
       <Root>
@@ -242,9 +251,11 @@ const Importer = ({ theme, onComplete, fields }) => {
             <div>
               <FileUploader setFile={setFile} />
               <Margin margin='40px 0 10px 0'>
+                {isPasteEnabled && <PasteInput onPaste={setString} />}
                 <h6>Or just manually enter your data</h6>
               </Margin>
               <DataEditor
+                setString={setString}
                 statistics={statistics}
                 formattedData={
                   formattedData.length > 0 ? formattedData : rowData
