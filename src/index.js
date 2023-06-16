@@ -5,7 +5,6 @@ import FileUploader from './components/FileUploader'
 import HeaderMapper from './components/HeaderMapper'
 import DataEditor from './components/DataEditor'
 import Completed from './components/Completed'
-import PasteInput from './components/PasteInput'
 import {
   fieldIsRequired,
   formatData,
@@ -39,8 +38,7 @@ function buildInitialState(inject) {
       total: null
     },
     headerMappings: {},
-    validationResult: new ValidationResult(),
-    withAutoMapping: false
+    validationResult: new ValidationResult()
   }
 }
 
@@ -80,7 +78,7 @@ const reducer = (state, action) => {
         currentStep
       }
     }
-    case 'CSV_PARSED': {
+    case 'FILE_PARSED': {
       const automaticHeaderMappings = buildSuggestedHeaderMappings(
         state.fields,
         action.payload.parsed.data[0]
@@ -118,33 +116,6 @@ const reducer = (state, action) => {
         formattedData: newFormattedData
       }
     }
-    case 'HEADER_MAPPINGS_AUTO_CONFIRMED': {
-      Object.values(action.payload.headerMappings).forEach((element) => {
-        element.confirmed = true
-      })
-
-      const newFormattedData = formatData(
-        action.payload.headerMappings,
-        state.parsed.data
-      )
-
-      const transformedFormattedData = applyTransformations(
-        newFormattedData,
-        state.fields
-      )
-
-      return {
-        ...state,
-        ...computeMetadata(
-          newFormattedData,
-          state.fields,
-          action.payload.headerMappings
-        ),
-        headerMappings: action.payload.headerMappings,
-        formattedData: transformedFormattedData,
-        currentStep: 2
-      }
-    }
     case 'CELL_CHANGED': {
       const copy = [...state.formattedData]
       copy[action.payload.index] = action.payload.row
@@ -166,8 +137,8 @@ const reducer = (state, action) => {
       return state
   }
 }
-// TODO: add more callbacks
-const Importer = ({ theme, onComplete, fields, withAutoMapping, isPasteEnabled }) => {
+
+const Importer = ({ theme, onComplete, fields }) => {
   const [
     {
       currentStep,
@@ -181,30 +152,19 @@ const Importer = ({ theme, onComplete, fields, withAutoMapping, isPasteEnabled }
       failed
     },
     dispatch
-  ] = useReducer(reducer, buildInitialState({ fields, withAutoMapping }))
+  ] = useReducer(reducer, buildInitialState({ fields }))
 
   const restart = () => {
     dispatch({ type: 'RESTART' })
   }
 
-  const parseCSV = (input) => {
-    Papa.parse(input, {
+  const setFile = (file) => {
+    Papa.parse(file, {
       skipEmptyLines: true,
       complete: (newParsed) => {
-        dispatch({ type: 'CSV_PARSED', payload: { parsed: newParsed } })
-        if(withAutoMapping) {
-          dispatch({ type: 'HEADER_MAPPINGS_AUTO_CONFIRMED', payload: { parsed: newParsed } })
-        }
+        dispatch({ type: 'FILE_PARSED', payload: { parsed: newParsed } })
       }
     })
-  }
-
-  const setFile = (file) => {
-    parseCSV(file)
-  }
-
-  const setString = (csv) => {
-    parseCSV(csv)
   }
 
   const rowData = []
@@ -260,7 +220,7 @@ const Importer = ({ theme, onComplete, fields, withAutoMapping, isPasteEnabled }
   }
 
   const finalTheme = mergeDeep({}, THEME_DEFAULT, theme)
-
+  console.log(theme?.colors?.primary, finalTheme.colors.primary)
   return (
     <ThemeProvider theme={finalTheme}>
       <Root>
@@ -282,14 +242,12 @@ const Importer = ({ theme, onComplete, fields, withAutoMapping, isPasteEnabled }
             <div>
               <FileUploader setFile={setFile} />
               <Margin margin='40px 0 10px 0'>
-                {isPasteEnabled && <PasteInput onPaste={setString} />}
                 <h6>Or just manually enter your data</h6>
               </Margin>
               <DataEditor
-                setString={setString}
                 statistics={statistics}
                 formattedData={
-                  formattedData.length > 0 ? formattedData.concat(rowData) : rowData // TODO: add single empty row each time
+                  formattedData.length > 0 ? formattedData : rowData
                 }
                 fields={fields}
                 headerMappings={headerMappings}
